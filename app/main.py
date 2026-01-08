@@ -5,6 +5,8 @@ from uuid import UUID
 from app.db import SessionLocal
 from app.models import Task
 from app.schemas import TaskCreate, TaskResponse
+from app.services.executor import executor, execute_task
+
 
 app = FastAPI()
 
@@ -31,6 +33,10 @@ def create_task(task: TaskCreate, db: Session = Depends(get_db)):
     db.add(new_task)
     db.commit()
     db.refresh(new_task)
+
+    # Submit task for background execution
+    executor.submit(execute_task, new_task.id)
+
     return new_task
 
 
