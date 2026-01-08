@@ -5,35 +5,50 @@ from sqlalchemy.orm import Session
 from app.models import Task
 from app.db import SessionLocal
 
-# Thread pool for concurrent task execution
+import random
+random.seed(12345)
+
+MAX_RETRIES = 2
+
 executor = ThreadPoolExecutor(max_workers=4)
 
 
 def execute_task(task_id):
-    """
-    Background task execution logic.
-    Runs in a separate thread.
-    """
     db: Session = SessionLocal()
     try:
         task = db.query(Task).filter(Task.id == task_id).first()
         if not task:
             return
 
-        # Mark task as RUNNING
         task.status = "RUNNING"
         db.commit()
 
-        # Simulate actual work
-        time.sleep(50)
+        time.sleep(3)
 
-        # Mark task as COMPLETED
+        # Simulate a 50% chance of failure
+        if random.random() < 0.5:
+            raise RuntimeError("Simulated failure")
+
         task.status = "COMPLETED"
         db.commit()
 
     except Exception:
-        # On failure, mark task as FAILED
-        task.status = "FAILED"
-        db.commit()
+        # IMPORTANT: reload task in a fresh state
+        db.rollback()
+
+        task = db.query(Task).filter(Task.id == task_id).first()
+        if not task:
+            return
+
+        task.retry_count += 1
+
+        if task.retry_count <= MAX_RETRIES:
+            task.status = "PENDING"
+            db.commit()
+            executor.submit(execute_task, task.id)
+        else:
+            task.status = "FAILED"
+            db.commit()
+
     finally:
         db.close()

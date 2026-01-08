@@ -11,6 +11,7 @@ class TaskResponse(BaseModel):
     id: UUID
     name: str
     status: str
+    retry_count: int
     created_at: datetime
 
     class Config:
