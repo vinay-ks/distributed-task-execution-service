@@ -6,7 +6,8 @@ from contextlib import asynccontextmanager # Added for lifespan
 from app.db import SessionLocal
 from app.models import Task
 from app.schemas import TaskCreate, TaskResponse
-from app.services.executor import executor, execute_task
+from app.services.executor import executor, execute_task, logger
+from app.metrics import metrics
 
 # --- Lifespan Manager (Replaces @app.on_event) ---
 @asynccontextmanager
@@ -29,7 +30,7 @@ async def lifespan(app: FastAPI):
             # 3. Re-submit all of them to the thread pool
             for tid in task_ids:
                 executor.submit(execute_task, tid)
-                print(f"Queued task for execution: {tid}")
+                logger.info(f"Recovering unfinished task {tid}")
     except Exception as e:
         print(f"Recovery failed: {e}")
         db.rollback()
@@ -67,6 +68,7 @@ def create_task(task: TaskCreate, db: Session = Depends(get_db)):
     db.add(new_task)
     db.commit()
     db.refresh(new_task)
+    metrics["tasks_created"] += 1
 
     # Submit task for background execution
     executor.submit(execute_task, new_task.id)
@@ -86,3 +88,7 @@ def get_task(task_id: UUID, db: Session = Depends(get_db)):
     if not task:
         raise HTTPException(status_code=404, detail="Task not found")
     return task
+
+@app.get("/metrics")
+def get_metrics():
+    return metrics

@@ -11,6 +11,8 @@ in the background using controlled concurrency, and tracks task state persistent
 - Task lifecycle management (PENDING, RUNNING, COMPLETED, FAILED)
 - Retry logic with bounded retries
 - Crash recovery on service restart
+- Structured logging for task execution and recovery events
+- Lightweight runtime metrics exposed via API
 - Automated API tests
 
 ## Tech Stack
